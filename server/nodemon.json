@@ -1,0 +1,5 @@
+{
+    "watch": ["src/index.ts", "src/websocket.ts", "src/rooms.ts"],
+    "exec": "tsx src/index.ts",
+    "ext": "ts"
+}

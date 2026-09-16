@@ -1,18 +1,31 @@
 import { WebSocketServer } from "ws";
 import type { Server } from "http";
-import { createRoom, getRoom } from "./rooms.js";
+import { createRoom, deleteRoom, getRoom } from "./rooms.js";
+import { randomUUID } from "crypto";
+import { WebSocket } from "ws";
 
 type Message = {
     type: string;
     roomId?: string;
+    targetClientId?: string;
 };
+
+const clients = new Map<string, WebSocket>();
 
 export function setupWebSocket(server: Server) {
     const wss = new WebSocketServer({ server });
 
     wss.on("connection", (socket) => {
-        console.log("websocket client connected");
-
+        const clientId = randomUUID();
+        clients.set(clientId, socket);
+        let currentRoomId: string | null = null;
+        console.log(`websocket client connected: ${clientId}`);
+        socket.send(
+            JSON.stringify({
+                type: "CONNECTED",
+                clientId
+            }),
+        );
         socket.on("message", (data) => {
             try {
                 const message: Message = JSON.parse(data.toString());
@@ -27,7 +40,7 @@ export function setupWebSocket(server: Server) {
                         return;
                     }
                     createRoom(message.roomId, socket);
-
+                    currentRoomId = message.roomId;
                     socket.send(
                         JSON.stringify({
                             type: "ROOM_CREATED",
@@ -37,7 +50,6 @@ export function setupWebSocket(server: Server) {
                     console.log(`Room ${message.roomId} created`);
                     return;
                 }
-
                 if (message.type === "JOIN_ROOM") {
                     if (!message.roomId) {
                         socket.send(
@@ -48,9 +60,7 @@ export function setupWebSocket(server: Server) {
                         );
                         return;
                     }
-
                     const room = getRoom(message.roomId);
-
                     if (!room) {
                         socket.send(
                             JSON.stringify({
@@ -60,9 +70,8 @@ export function setupWebSocket(server: Server) {
                         );
                         return;
                     }
-
                     room.viewers.add(socket);
-
+                    currentRoomId = message.roomId;
                     socket.send(
                         JSON.stringify({
                             type: "ROOM_JOINED",
@@ -73,13 +82,27 @@ export function setupWebSocket(server: Server) {
                         room.host.send(
                             JSON.stringify({
                                 type: "VIEWER_JOINED",
+                                clientId
                             }),
                         );
                     }
                     console.log(`viewer joined room ${message.roomId}`);
                     return;
                 }
-
+                if (message.targetClientId) {
+                    const targetSocket = clients.get(message.targetClientId);
+                    if (!targetSocket) {
+                        socket.send(
+                            JSON.stringify({
+                                type: "ERROR",
+                                message: "target client not found"
+                            }),
+                        );
+                        return;
+                    }
+                    targetSocket.send(JSON.stringify(message));
+                    return;
+                }
                 socket.send(
                     JSON.stringify({
                         type: "ERROR",
@@ -95,9 +118,27 @@ export function setupWebSocket(server: Server) {
                 );
             }
         })
-
         socket.on("close", () => {
-            console.log("websocket client disconnected");
+            clients.delete(clientId);
+            console.log(`websocket client disconnected: ${clientId}`);
+            if (!currentRoomId) {
+                return;
+            }
+            const room = getRoom(currentRoomId);
+            if (!room) {
+                return;
+            }
+            if (room.host === socket) {
+                room.host == null;
+                console.log(`host left room ${currentRoomId}`);   
+            } else {
+                room.viewers.delete(socket);
+                console.log(`viewer left room ${currentRoomId}`);
+            }
+            if (!room.host && room.viewers.size === 0) {
+                deleteRoom(currentRoomId);
+                console.log(`room ${currentRoomId} deleted`);
+            }
         });
     });
 

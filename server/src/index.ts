@@ -7,7 +7,6 @@ const server = createServer((req, res) => {
     res.writeHead(200, {
         "content-type": "text/plain",
     });
-    
     res.end("streaming server is running");
 });
 setupWebSocket(server);

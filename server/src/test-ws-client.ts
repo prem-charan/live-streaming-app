@@ -11,6 +11,11 @@ socket.on("open", () => {
             roomId: "1234567",
         }),
     );
+    // socket.send(
+    //     JSON.stringify({
+            
+    //     })
+    // )
 });
 
 socket.on("message", (message) => {
