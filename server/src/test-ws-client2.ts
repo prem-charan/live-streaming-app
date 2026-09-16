@@ -7,7 +7,7 @@ socket.on("open", () => {
 
     socket.send(
         JSON.stringify({
-            type: "CREATE_ROOM",
+            type: "JOIN_ROOM",
             roomId: "1234567",
         }),
     );
