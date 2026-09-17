@@ -10,7 +10,8 @@ type Message = {
     targetClientId?: string;
 };
 
-const clients = new Map<string, WebSocket>();
+const clients = new Map<string, WebSocket>(); // mapping clients to websocket
+const clientRooms = new Map<string, string>(); // mapping clients to rooms
 
 export function setupWebSocket(server: Server) {
     const wss = new WebSocketServer({ server });
@@ -39,8 +40,18 @@ export function setupWebSocket(server: Server) {
                         );
                         return;
                     }
+                    if (currentRoomId) {
+                        socket.send(
+                            JSON.stringify({
+                                type: "ERROR",
+                                message: "already in a room"
+                            }),
+                        );
+                        return;
+                    }
                     createRoom(message.roomId, socket);
                     currentRoomId = message.roomId;
+                    clientRooms.set(clientId, message.roomId);
                     socket.send(
                         JSON.stringify({
                             type: "ROOM_CREATED",
@@ -60,6 +71,15 @@ export function setupWebSocket(server: Server) {
                         );
                         return;
                     }
+                    if (currentRoomId) {
+                            socket.send(
+                                JSON.stringify({
+                                    type: "ERROR",
+                                    message: "Already in a room",
+                                }),
+                            );
+                            return;
+                    }
                     const room = getRoom(message.roomId);
                     if (!room) {
                         socket.send(
@@ -72,6 +92,7 @@ export function setupWebSocket(server: Server) {
                     }
                     room.viewers.add(socket);
                     currentRoomId = message.roomId;
+                    clientRooms.set(clientId, message.roomId);
                     socket.send(
                         JSON.stringify({
                             type: "ROOM_JOINED",
@@ -100,6 +121,16 @@ export function setupWebSocket(server: Server) {
                         );
                         return;
                     }
+                    const targetRoomId = clientRooms.get(message.targetClientId);
+                    if (!currentRoomId || targetRoomId !== currentRoomId) {
+                        socket.send(
+                            JSON.stringify({
+                                type: "ERROR",
+                                message: "target client is not in the same room"
+                            }),
+                        );
+                        return;
+                    }
                     targetSocket.send(JSON.stringify(message));
                     return;
                 }
@@ -120,6 +151,7 @@ export function setupWebSocket(server: Server) {
         })
         socket.on("close", () => {
             clients.delete(clientId);
+            clientRooms.delete(clientId);
             console.log(`websocket client disconnected: ${clientId}`);
             if (!currentRoomId) {
                 return;
@@ -129,7 +161,7 @@ export function setupWebSocket(server: Server) {
                 return;
             }
             if (room.host === socket) {
-                room.host == null;
+                room.host = null;
                 console.log(`host left room ${currentRoomId}`);   
             } else {
                 room.viewers.delete(socket);

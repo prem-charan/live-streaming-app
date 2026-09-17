@@ -7,17 +7,10 @@ socket.on("open", () => {
 
     socket.send(
         JSON.stringify({
-            type: "CREATE_ROOM",
-            roomId: "1234567"
+            type: "JOIN_ROOM",
+            roomId: "1234568",
         }),
     );
-    socket.send(
-        JSON.stringify({
-            roomId: "1234567",
-            targetClientId: "df460dbb-8754-414f-86ae-ef81708180a7"
-        }),
-    );
-    
 });
 
 socket.on("message", (message) => {
