@@ -1,6 +1,11 @@
 import WebSocket from "ws";
+import readline, { Interface } from "node:readline";
 
 const socket = new WebSocket("ws://localhost:3000");
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+});
 
 socket.on("open", () => {
     console.log("Connected to WebSocket server");
@@ -11,19 +16,23 @@ socket.on("open", () => {
             roomId: "1234567"
         }),
     );
-    socket.send(
-        JSON.stringify({
-            roomId: "1234567",
-            targetClientId: "df460dbb-8754-414f-86ae-ef81708180a7"
-        }),
-    );
-    
 });
-
 socket.on("message", (message) => {
     console.log("recieved:", message.toString());
 });
-
 socket.on("close", () => {
     console.log("Disconnected");
+});
+rl.on("line", (input) => {
+    const [command, targetClientId] = input.trim().split(" ");
+    if (command === "offer" && targetClientId) {
+        socket.send(
+            JSON.stringify({
+                type: "OFFER",
+                targetClientId,
+                sdp: "TEST_OFFER",
+            }),
+        );
+        console.log(`OFFER sent to ${targetClientId}`);
+    }
 });
